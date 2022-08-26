@@ -19,7 +19,7 @@ class MyRouter {
         name: Pages.signUp.getKey(),
         path: Pages.signUp.getPath(),
         builder: (BuildContext context, GoRouterState state) => PDevice(          
-          bloc: () => ServiceLocator.instance.bSignUp(),
+          bloc: () => ServiceLocator.instance.bDevice(),
         ),
       ),
     ],
