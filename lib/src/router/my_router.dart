@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../pages/error/v_error.dart';
 import '../pages/device/bloc/p_device.dart';
 import '../utils/service_locator.dart';
 import 'pages.dart';
@@ -24,6 +23,6 @@ class MyRouter {
       ),
     ],
     errorBuilder: (BuildContext context, GoRouterState state) =>
-        VError(error: state.error.toString()),
+        Container(),
   );
 }

@@ -1,5 +1,5 @@
 class Device {
   String? name;
-  String? distance;
+  int? distance;
   String? macAddres;
 }

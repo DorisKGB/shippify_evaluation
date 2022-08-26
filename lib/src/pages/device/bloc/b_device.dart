@@ -1,3 +1,6 @@
+import 'dart:io';
+import 'dart:math';
+
 import 'package:rxdart/rxdart.dart';
 import 'package:shippify_evaluation/core/entities/device.dart';
 import 'package:shippify_evaluation/src/models/m_device_view.dart';
@@ -11,7 +14,7 @@ class BDevice extends BlocBase {
     getAllDevices();
   }
   final RDeviceLocal rDeviceLocal;
-
+  List<Device>? blueDevices;
   FlutterBluePlus flutterBlue = FlutterBluePlus.instance;
   final BehaviorSubject<List<MDeviceView>?> _listDevice =
       BehaviorSubject<List<MDeviceView>?>();
@@ -22,14 +25,20 @@ class BDevice extends BlocBase {
 
   Future<List<Device>> getBlueDevices() async {
     try {
-      List<ScanResult> devices =
+      if ((await flutterBlue.isOn) == false) {
+        if (Platform.isAndroid) {
+          await flutterBlue.turnOn();
+          await Future.delayed(const Duration(seconds: 3));
+        }
+      }
+      List<ScanResult> blueDevices =
           await flutterBlue.startScan(timeout: const Duration(seconds: 4));
       final List<Device> listDeviceAux = [];
-      for (ScanResult dev in devices) {
+      for (ScanResult dev in blueDevices) {
         listDeviceAux.add(Device()
-          ..name = dev.device.name.isEmpty ? "Sin nombre" : dev.device.name
+          ..name = dev.device.name.isEmpty ? "No name" : dev.device.name
           ..macAddres = dev.device.id.id
-          ..distance = dev.rssi.toString());
+          ..distance = dev.rssi);
       }
       return listDeviceAux;
       //    inListDevice(listDeviceAux);
@@ -46,11 +55,14 @@ class BDevice extends BlocBase {
     }
   }
 
-  Future<void> getAllDevices() async {
+  Future<void> getAllDevices([bool refeshBlueDevice = true]) async {
     try {
       inListDevice(null);
       final List<MDeviceView> mDeviceView = [];
-      final blueDevices = await getBlueDevices();
+      //final blueDevices = await getBlueDevices();
+      if (refeshBlueDevice) {
+        blueDevices = await getBlueDevices();
+      }
       final localDevices = await getLocalDevices();
       for (Device ld in localDevices) {
         final dv = Device()
@@ -61,10 +73,12 @@ class BDevice extends BlocBase {
           ..device = dv
           ..save = true);
       }
-      for (Device bd in blueDevices) {
+      // compare bluetooth list vs saved devices list
+      for (Device bd in blueDevices!) {
         var isSave = false;
         for (MDeviceView md in mDeviceView) {
           if (md.device?.macAddres == bd.macAddres) {
+            md.isAvailable = true;
             isSave = true;
             break;
           }
@@ -74,7 +88,9 @@ class BDevice extends BlocBase {
             ..name = bd.name
             ..distance = bd.distance
             ..macAddres = bd.macAddres;
-          mDeviceView.add(MDeviceView()..device = dv);
+          mDeviceView.add(MDeviceView()
+            ..device = dv
+            ..isAvailable = true);
         }
       }
       inListDevice(mDeviceView);
@@ -87,10 +103,11 @@ class BDevice extends BlocBase {
   void deleteDeviceLocal(MDeviceView mDeviceView) async {
     try {
       final List<Device> localDevices = await getLocalDevices();
-      localDevices.removeWhere((ld) => ld.macAddres == mDeviceView.device?.macAddres);
+      localDevices
+          .removeWhere((ld) => ld.macAddres == mDeviceView.device?.macAddres);
       rDeviceLocal.saveDevices(localDevices.toSet());
-      await getAllDevices();
-      showMessage('Se eliminó el dispositivo');
+      await getAllDevices(false);
+      showMessage('Device was removed');
     } catch (e) {
       return Future.error(e);
     }
@@ -109,11 +126,24 @@ class BDevice extends BlocBase {
         }
       }
       rDeviceLocal.saveDevices(listDeviceAux);
-      await getAllDevices();
-      showMessage('Se guardó el dispositivo');
+      await getAllDevices(false);
+      showMessage('The device was saved');
     } catch (e) {
       //log(e.toString(), stackTrace: stackTrace);
       showMessage(getErrorMessage(e.toString()));
+    }
+  }
+
+  String getDistance(int rssi) {
+    final num distanceInMeters = pow(10, (-69 - (rssi)) / (10 * 2));
+    if (distanceInMeters < 5) {
+      return 'Very near';
+    } else if (distanceInMeters < 10) {
+      return 'Near';
+    } else if (distanceInMeters < 15) {
+      return 'Far';
+    } else {
+      return 'Very far';
     }
   }
 
